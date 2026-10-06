@@ -2,13 +2,17 @@ package connectors
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/notBigO/dbmix/internal/model"
 )
 
-type column struct{ name, native, nullable, key, generated string }
+type column struct {
+	name, native, nullable, key, generated string
+	precision                              sql.NullInt64
+}
 
 func (s *sqlDB) columns(ctx context.Context, entity string) ([]column, error) {
 	ns, name := s.namespace(entity)
@@ -17,11 +21,11 @@ func (s *sqlDB) columns(ctx context.Context, entity string) ([]column, error) {
 	if s.dialect == "postgres" {
 		q = `SELECT c.column_name,c.udt_name,c.is_nullable,
   CASE WHEN EXISTS (SELECT 1 FROM information_schema.table_constraints t JOIN information_schema.key_column_usage k ON t.constraint_name=k.constraint_name AND t.constraint_schema=k.constraint_schema AND t.table_name=k.table_name WHERE t.constraint_type='PRIMARY KEY' AND t.table_schema=c.table_schema AND t.table_name=c.table_name AND k.column_name=c.column_name) THEN 'PRI' ELSE '' END,
-  CASE WHEN c.is_generated='ALWAYS' OR c.is_identity='YES' THEN 'generated' ELSE '' END
+  CASE WHEN c.is_generated='ALWAYS' OR c.is_identity='YES' THEN 'generated' ELSE '' END,c.datetime_precision
   FROM information_schema.columns c WHERE c.table_schema=$1 AND c.table_name=$2 ORDER BY c.ordinal_position`
 		args = []any{ns, name}
 	} else {
-		q = `SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_KEY,EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? ORDER BY ORDINAL_POSITION`
+		q = `SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_KEY,EXTRA,DATETIME_PRECISION FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? ORDER BY ORDINAL_POSITION`
 		args = []any{name}
 	}
 	rows, err := s.db.QueryContext(ctx, q, args...)
@@ -32,7 +36,7 @@ func (s *sqlDB) columns(ctx context.Context, entity string) ([]column, error) {
 	var out []column
 	for rows.Next() {
 		var c column
-		if err = rows.Scan(&c.name, &c.native, &c.nullable, &c.key, &c.generated); err != nil {
+		if err = rows.Scan(&c.name, &c.native, &c.nullable, &c.key, &c.generated, &c.precision); err != nil {
 			return nil, safeError("scan columns", err)
 		}
 		out = append(out, c)
@@ -181,6 +185,9 @@ func (s *sqlDB) Validate(ctx context.Context, entity string, want model.Schema) 
 				return fmt.Errorf("destination primary key differs")
 			}
 		}
+		if f.Type == model.Time && (!c.precision.Valid || c.precision.Int64 != 6) {
+			return fmt.Errorf("destination column %s requires microsecond timestamp precision", c.name)
+		}
 		if !s.compatible(c.native, f) {
 			return fmt.Errorf("destination column %s must use canonical type %s (found %s)", c.name, s.ddlType(f), c.native)
 		}
@@ -218,6 +225,13 @@ func (s *sqlDB) Prepare(ctx context.Context, entity string, schema model.Schema)
 	if err := s.Validate(ctx, entity, schema); err != nil {
 		return err
 	}
+	existing, err := s.columns(ctx, entity)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
+	}
 	defs := make([]string, 0, len(schema.Fields)+1)
 	for _, f := range schema.Fields {
 		d := s.quote(f.Name) + " " + s.ddlType(f)
@@ -231,7 +245,7 @@ func (s *sqlDB) Prepare(ctx context.Context, entity string, schema model.Schema)
 	if s.dialect == "mysql" {
 		suffix = " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
 	}
-	_, err := s.db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+s.table(entity)+" ("+strings.Join(defs, ",")+")"+suffix)
+	_, err = s.db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+s.table(entity)+" ("+strings.Join(defs, ",")+")"+suffix)
 	if err != nil {
 		return safeError("create destination table", err)
 	}

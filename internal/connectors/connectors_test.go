@@ -87,3 +87,13 @@ func TestIdentifierQuoting(t *testing.T) {
 		t.Fatal("unsafe mysql quote")
 	}
 }
+
+func TestPostgresDefaultNamespace(t *testing.T) {
+	s := sqlDB{dialect: "postgres"}
+	if s.table("users") != `"public"."users"` {
+		t.Fatal("unqualified reads must match metadata's public namespace")
+	}
+	if s.table("other.users") != `"other"."users"` {
+		t.Fatal("explicit schema lost")
+	}
+}

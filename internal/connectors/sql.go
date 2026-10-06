@@ -83,6 +83,9 @@ func (s *sqlDB) quote(x string) string {
 	return `"` + strings.ReplaceAll(x, `"`, `""`) + `"`
 }
 func (s *sqlDB) table(x string) string {
+	if s.dialect == "postgres" && !strings.Contains(x, ".") {
+		x = "public." + x
+	}
 	p := strings.Split(x, ".")
 	for i := range p {
 		p[i] = s.quote(p[i])

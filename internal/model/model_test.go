@@ -30,3 +30,32 @@ func TestTransform(t *testing.T) {
 		t.Fatal("mutated source")
 	}
 }
+
+func TestEmptyBinaryIsNotNull(t *testing.T) {
+	v, err := Normalize([]byte(nil), Field{Name: "payload", Type: Bytes})
+	if err != nil || v.([]byte) == nil {
+		t.Fatalf("empty binary would become SQL NULL: %v", err)
+	}
+}
+
+func TestAmbiguousJSONRejected(t *testing.T) {
+	for _, raw := range []string{`{"a":1,"a":2}`, `{"nested":[{"key":1,"key":2}]}`} {
+		if _, err := Normalize(json.RawMessage(raw), Field{Name: "data", Type: JSON}); err == nil {
+			t.Fatal("duplicate key was silently discarded")
+		}
+	}
+	if _, err := Normalize(json.RawMessage(`{"a":[1,2],"b":{"a":1}}`), Field{Name: "data", Type: JSON}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJSONUnicodeEscapes(t *testing.T) {
+	for _, tt := range []struct {
+		raw string
+		bad bool
+	}{{`"\ud800"`, true}, {`"\udfff"`, true}, {`"\ud800\u1234"`, true}, {`"\ud83d\ude00"`, false}, {`"\\ud800"`, false}, {`"\ufffd"`, false}} {
+		if err := validateJSON(json.RawMessage(tt.raw)); (err != nil) != tt.bad {
+			t.Fatalf("%s: %v", tt.raw, err)
+		}
+	}
+}

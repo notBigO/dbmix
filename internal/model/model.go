@@ -102,10 +102,16 @@ func Normalize(v any, f Field) (any, error) {
 		}
 	case Bytes:
 		if x, ok := v.([]byte); ok {
+			if x == nil {
+				return []byte{}, nil
+			}
 			return x, nil
 		}
 	case JSON:
-		if x, ok := v.(json.RawMessage); ok && json.Valid(x) {
+		if x, ok := v.(json.RawMessage); ok {
+			if err := validateJSON(x); err != nil {
+				return nil, fmt.Errorf("field %s: %w", f.Name, err)
+			}
 			return x, nil
 		}
 	}

@@ -190,7 +190,14 @@ func (m *mongoDB) Prepare(ctx context.Context, entity string, schema model.Schem
 	if err := m.Validate(ctx, entity, schema); err != nil {
 		return err
 	}
-	err := m.db.CreateCollection(ctx, entity)
+	names, err := m.db.ListCollectionNames(ctx, bson.M{"name": entity})
+	if err != nil {
+		return safeError("inspect destination collection", err)
+	}
+	if len(names) > 0 {
+		return nil
+	}
+	err = m.db.CreateCollection(ctx, entity)
 	if err != nil {
 		if command, ok := err.(mongo.CommandError); !ok || command.Code != 48 {
 			return safeError("create collection", err)

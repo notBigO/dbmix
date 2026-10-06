@@ -345,3 +345,20 @@ func TestRejectMixedMongoKeysAndUnsafeMySQLIndex(t *testing.T) {
 		t.Fatal("ambiguous MySQL upsert accepted")
 	}
 }
+
+func TestRejectTimestampRounding(t *testing.T) {
+	seed(t, "postgres", "precision_source", 1)
+	seed(t, "postgres", "precision_target", 0)
+	if _, err := pg.Exec("ALTER TABLE precision_target ALTER COLUMN created_at TYPE timestamptz(0)"); err != nil {
+		t.Fatal(err)
+	}
+	c := cfg(t, "postgres", "postgres", "precision_source", "precision_target")
+	s, d, err := connectors.Open(context.Background(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close(); _ = d.Close() }()
+	if _, err = planner.Build(context.Background(), c, s, d); err == nil || !strings.Contains(err.Error(), "precision") {
+		t.Fatalf("narrowing timestamp destination accepted: %v", err)
+	}
+}
