@@ -1,0 +1,19 @@
+version: 1
+source: {type: postgres, uri: '${SOURCE_URI}', allow_insecure: true}
+destination:
+  type: mongodb
+  uri: ${MONGODB_URI}
+  database: dbmix
+  allow_insecure: true
+source_quiescent: true
+batch_size: 1000
+workers: 4
+entities:
+  - source: public.customers
+    target: customers
+    key: id
+    fields:
+      - {source: id, target: _id}
+      - {source: email, target: email}
+      - {source: created_at, target: createdAt}
+      - {source: metadata, target: metadata}

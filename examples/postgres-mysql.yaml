@@ -1,0 +1,18 @@
+version: 1
+source:
+  type: postgres
+  uri: ${SOURCE_URI}
+  allow_insecure: true # Disposable local Compose environment only.
+destination:
+  type: mysql
+  uri: ${DESTINATION_URI}
+  allow_insecure: true
+source_quiescent: true
+mode: upsert
+batch_size: 1000
+workers: 4
+queue_size: 4
+entities:
+  - source: public.customers
+    target: customers
+    key: id
