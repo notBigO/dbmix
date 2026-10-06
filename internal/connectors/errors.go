@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
@@ -42,6 +43,13 @@ func safeError(op string, err error) error {
 	var command mongo.CommandError
 	if errors.As(err, &command) {
 		return &dbError{op, fmt.Sprint(command.Code), command.HasErrorLabel("RetryableWriteError") || command.Code == 91 || command.Code == 11600}
+	}
+	var labeled interface{ HasErrorLabel(string) bool }
+	if errors.As(err, &labeled) && (labeled.HasErrorLabel("RetryableWriteError") || labeled.HasErrorLabel("TransientTransactionError")) {
+		return &dbError{op, "retryable_write", true}
+	}
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, mysql.ErrInvalidConn) {
+		return &dbError{op, "connection_lost", true}
 	}
 	var network net.Error
 	if errors.As(err, &network) {

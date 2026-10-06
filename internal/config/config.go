@@ -12,6 +12,7 @@ import (
 )
 
 type Endpoint struct {
+	AssumeUTC     bool   `yaml:"assume_utc,omitempty" json:"assume_utc,omitempty"`
 	Type          string `yaml:"type" json:"type"`
 	URI           string `yaml:"uri" json:"uri"`
 	Database      string `yaml:"database,omitempty" json:"database,omitempty"`
@@ -115,6 +116,12 @@ func (c Config) Validate() error {
 		}
 		if !envRef.MatchString(e.URI) {
 			return fmt.Errorf("%s uri must reference an environment variable, e.g. ${DB_URI}", e.Type)
+		}
+		if e.Type != "mongodb" && e.Database != "" {
+			return fmt.Errorf("SQL database belongs in the connection URI, not database")
+		}
+		if e.AssumeUTC && e.Type != "mysql" {
+			return fmt.Errorf("assume_utc applies only to MySQL")
 		}
 		if e.Type == "mongodb" && !Identifier(e.Database) {
 			return fmt.Errorf("mongodb requires a simple database name")

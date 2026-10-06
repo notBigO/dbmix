@@ -47,7 +47,7 @@ func (s *sqlDB) Write(ctx context.Context, entity string, schema model.Schema, r
 	if err != nil {
 		return safeError("prepare upsert", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 	for _, r := range records {
 		args := make([]any, len(schema.Fields))
 		for i, f := range schema.Fields {

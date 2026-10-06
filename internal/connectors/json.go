@@ -17,6 +17,9 @@ func jsonToBSON(raw json.RawMessage, field string) (any, error) {
 	if err := dec.Decode(&v); err != nil {
 		return nil, fmt.Errorf("field %s: invalid JSON", field)
 	}
+	if v == nil {
+		return nil, fmt.Errorf("field %s: top-level JSON null is ambiguous with BSON null", field)
+	}
 	result, err := jsonValue(v)
 	if err != nil {
 		return nil, fmt.Errorf("field %s: %w", field, err)

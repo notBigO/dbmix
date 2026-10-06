@@ -28,7 +28,7 @@ func (s *sqlDB) columns(ctx context.Context, entity string) ([]column, error) {
 	if err != nil {
 		return nil, safeError("discover columns", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []column
 	for rows.Next() {
 		var c column

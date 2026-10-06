@@ -42,7 +42,12 @@ func Open(ctx context.Context, c config.Config) (connector.Source, connector.Des
 	if c.Source.Type == c.Destination.Type && a == b && c.Source.Database == c.Destination.Database {
 		for _, s := range c.Entities {
 			for _, d := range c.Entities {
-				if s.Source == d.Target {
+				sourceName, targetName := s.Source, d.Target
+				if c.Source.Type == "postgres" {
+					sourceName = strings.TrimPrefix(sourceName, "public.")
+					targetName = strings.TrimPrefix(targetName, "public.")
+				}
+				if sourceName == targetName {
 					return nil, nil, fmt.Errorf("source and destination entities overlap")
 				}
 			}

@@ -18,8 +18,9 @@ import (
 )
 
 type sqlDB struct {
-	db      *sql.DB
-	dialect string
+	assumeUTC bool
+	db        *sql.DB
+	dialect   string
 }
 
 func openSQL(ctx context.Context, e config.Endpoint, uri string, pool int) (*sqlDB, error) {
@@ -72,14 +73,14 @@ func openSQL(ctx context.Context, e config.Endpoint, uri string, pool int) (*sql
 		_ = db.Close()
 		return nil, safeError("ping", err)
 	}
-	return &sqlDB{db: db, dialect: e.Type}, nil
+	return &sqlDB{db: db, dialect: e.Type, assumeUTC: e.AssumeUTC}, nil
 }
 func (s *sqlDB) Close() error { return s.db.Close() }
 func (s *sqlDB) quote(x string) string {
 	if s.dialect == "mysql" {
-		return "`" + x + "`"
+		return "`" + strings.ReplaceAll(x, "`", "``") + "`"
 	}
-	return `"` + x + `"`
+	return `"` + strings.ReplaceAll(x, `"`, `""`) + `"`
 }
 func (s *sqlDB) table(x string) string {
 	p := strings.Split(x, ".")
@@ -108,6 +109,17 @@ func (s *sqlDB) Inspect(ctx context.Context, e config.Entity) (model.Inspection,
 	}
 	if !exists {
 		return model.Inspection{}, fmt.Errorf("table %s does not exist", e.Source)
+	}
+	if s.dialect == "mysql" && !s.assumeUTC {
+		cols, err := s.columns(ctx, e.Source)
+		if err != nil {
+			return model.Inspection{}, err
+		}
+		for _, col := range cols {
+			if strings.HasPrefix(col.native, "datetime") {
+				return model.Inspection{}, fmt.Errorf("MySQL DATETIME has no timezone; set source.assume_utc: true only when values represent UTC")
+			}
+		}
 	}
 	if schema.Key != e.Key {
 		return model.Inspection{}, fmt.Errorf("%s must be the table's single-column primary key", e.Key)
@@ -172,7 +184,7 @@ func (s *sqlDB) Read(ctx context.Context, entity string, schema model.Schema, af
 	if err != nil {
 		return nil, "", safeError("read rows", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]model.Record, 0, limit)
 	cursor := after
 	for rows.Next() {

@@ -40,7 +40,10 @@ func Build(ctx context.Context, c config.Config, s connector.Source, d connector
 		if err != nil {
 			return p, err
 		}
-		ep.EstimatedBatches = (ep.EstimatedRows + int64(c.BatchSize) - 1) / int64(c.BatchSize)
+		ep.EstimatedBatches = -1
+		if ep.EstimatedRows >= 0 {
+			ep.EstimatedBatches = (ep.EstimatedRows + int64(c.BatchSize) - 1) / int64(c.BatchSize)
+		}
 		if err = d.Validate(ctx, e.Target, ep.Output); err != nil {
 			return p, fmt.Errorf("validate destination %s: %w", e.Target, err)
 		}
@@ -61,6 +64,9 @@ func Map(e config.Entity, i model.Inspection) (Entity, error) {
 		}
 	}
 	for _, f := range fields {
+		if !config.Identifier(f.Source) || !config.Identifier(f.Target) {
+			return p, fmt.Errorf("discovered field requires preprocessing: unsupported identifier")
+		}
 		src, ok := i.Schema.Field(f.Source)
 		if !ok {
 			return p, fmt.Errorf("source field %s not found", f.Source)
