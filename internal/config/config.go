@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/notBigO/dbmix/internal/model"
 	"go.yaml.in/yaml/v3"
@@ -135,10 +136,14 @@ func (c Config) Validate() error {
 		if !EntityName(e.Source) || !EntityName(e.Target) || !Identifier(e.Key) {
 			return fmt.Errorf("invalid entity or key identifier")
 		}
-		if targets[e.Target] {
+		target := e.Target
+		if c.Destination.Type == "postgres" {
+			target = strings.TrimPrefix(target, "public.")
+		}
+		if targets[target] {
 			return fmt.Errorf("duplicate destination entity %s", e.Target)
 		}
-		targets[e.Target] = true
+		targets[target] = true
 		if c.Source.Type == "mongodb" && len(e.Fields) == 0 {
 			return fmt.Errorf("MongoDB source %s requires explicit fields and types", e.Source)
 		}

@@ -41,3 +41,10 @@ func TestResolve(t *testing.T) {
 		t.Fatal("missing environment accepted")
 	}
 }
+
+func TestDuplicatePostgresTargetAliases(t *testing.T) {
+	text := strings.Replace(valid, "type: mysql", "type: postgres", 1) + "  - {source: other, target: public.users, key: id}\n"
+	if _, err := Parse([]byte(text)); err == nil {
+		t.Fatal("duplicate physical target accepted under public alias")
+	}
+}
