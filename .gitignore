@@ -1,0 +1,5 @@
+/bin/
+/.dbmix/
+.env
+*.test
+coverage.out
