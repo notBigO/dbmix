@@ -285,7 +285,7 @@ func TestDestinationUnavailableResume(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := compose("start", "--wait", "mysql"); err != nil {
+		if err := compose("up", "-d", "--wait", "mysql"); err != nil {
 			t.Error(err)
 		}
 	})
@@ -298,7 +298,7 @@ func TestDestinationUnavailableResume(t *testing.T) {
 	if m.Status != "failed" && m.Status != "interrupted" {
 		t.Fatal("wrong failure status")
 	}
-	if err := compose("start", "--wait", "mysql"); err != nil {
+	if err := compose("up", "-d", "--wait", "mysql"); err != nil {
 		t.Fatal(err)
 	}
 	// A fresh process would open new pools. Reopen here rather than relying on driver recovery.
