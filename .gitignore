@@ -3,3 +3,7 @@
 .env
 *.test
 coverage.out
+
+# Keep local reference material outside source control.
+/docs/
+*.md
