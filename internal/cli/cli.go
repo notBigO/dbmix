@@ -54,7 +54,7 @@ func Run(ctx context.Context, args []string, out, errOut io.Writer, version stri
 		_, err := fmt.Fprintln(out, "dbmix", version)
 		return err
 	case "connectors":
-		_, err := fmt.Fprintln(out, "NAME        SOURCE  DESTINATION\npostgres    yes     yes\nmysql       yes     yes\nmongodb     yes     yes\n\nOffline upserts only. See docs/connectors.md for type and key restrictions.")
+		_, err := fmt.Fprintln(out, "NAME        SOURCE  DESTINATION\npostgres    yes     yes\nmysql       yes     yes\nmongodb     yes     yes\n\nOffline upserts only. SQL source keys: signed integers. MongoDB source keys: integer or ObjectID.")
 		return err
 	}
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
